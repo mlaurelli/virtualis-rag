@@ -1,0 +1,12 @@
+# Contesto di build ridotto al necessario (backend/Dockerfile)
+.git
+.venv
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/dist
+data
+.env
+*.docx
+.DS_Store

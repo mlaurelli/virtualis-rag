@@ -1,0 +1,96 @@
+[project]
+name = "virtualis-backend"
+version = "0.1.0"
+description = "Backend del sistema RAG agentico di gestione documentale Virtualis"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "openai>=1.40",
+    "pyjwt>=2.8",
+    "pwdlib[argon2]>=0.2",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27",
+    "sse-starlette>=2.1",
+    "structlog>=24.1",
+    "docling>=2.0",
+    "qdrant-client[fastembed]>=1.11",
+    "fastembed>=0.4",
+    "tiktoken>=0.7",
+    "sentence-transformers>=3.0",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "fastmcp>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+gdrive = [
+    "google-api-python-client>=2.130",
+    "google-auth>=2.30",
+    "google-auth-oauthlib>=1.2",
+]
+m365 = [
+    "msal>=1.28",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# I prompt sono stringhe multilinea il cui contenuto va testualmente al LLM:
+# spezzare le righe per E501 altererebbe il testo inviato, quindi la regola
+# è disattivata solo in questo modulo.
+"app/agent/prompts.py" = ["E501"]
+"app/knowledge/prompts.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+disallow_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+mypy_path = "."
+files = ["app"]
+
+[[tool.mypy.overrides]]
+# Librerie senza type stub: ignoriamo gli import mancanti (non forniscono py.typed).
+# msal/google/googleapiclient sono extra opzionali ([m365]/[gdrive]), non installate di default.
+module = [
+    "docling.*",
+    "fastembed.*",
+    "qdrant_client.*",
+    "tiktoken.*",
+    "sentence_transformers.*",
+    "msal.*",
+    "google.*",
+    "googleapiclient.*",
+]
+ignore_missing_imports = true

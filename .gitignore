@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Dati applicativi (DB, upload, indici)
+data/
+data-demo/
+demo_corpus/
+eval_report.json
+
+# Frontend (fasi successive)
+node_modules/
+
+# Ambiente e segreti
+.env
+# Contiene credenziali operative (SSH, admin web): non va mai su GitHub
+AGENTS.md
+
+# Sistema
+.DS_Store
+~$*

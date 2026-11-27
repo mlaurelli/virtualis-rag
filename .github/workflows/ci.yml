@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Cache unica per i modelli di retrieval (fastembed e sentence-transformers
+      # usano entrambi huggingface_hub): senza di essa ogni run riscaricherebbe ~2 GB.
+      HF_HOME: ${{ github.workspace }}/.hf_cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Installa Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache modelli HuggingFace
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.hf_cache
+          # Chiave stabile: i modelli sono pinnati nella config (DENSE_MODEL, ecc.)
+          key: hf-models-v1-${{ runner.os }}
+          restore-keys: hf-models-
+
+      - name: Installa dipendenze
+        run: uv sync --extra dev
+
+      - name: Ruff
+        run: uv run ruff check app tests scripts
+
+      - name: Mypy
+        run: uv run mypy app
+
+      - name: Test (pytest)
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installa dipendenze
+        run: npm ci
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Build (typecheck + vite)
+        run: npm run build
+
+  # Suite E2E Playwright contro il backend reale (frontend/e2e). L'ingest dei
+  # documenti di test usa i modelli fastembed e la ricerca il reranker: anche
+  # con cache HF il primo run scarica ~4 GB di modelli e il job è molto più
+  # lento e pesante degli altri. Per questo è informativo (continue-on-error):
+  # la suite è pensata per girare in verde in locale (`make test-e2e`) e la
+  # CI ne segnala le regressioni senza bloccare le PR.
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      # Stessa cache dei modelli del job backend (fastembed + reranker)
+      HF_HOME: ${{ github.workspace }}/.hf_cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installa Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Installa uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Installa Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache modelli HuggingFace
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.hf_cache
+          key: hf-models-v1-${{ runner.os }}
+          restore-keys: hf-models-
+
+      - name: Installa dipendenze backend
+        run: cd backend && uv sync
+
+      - name: Installa dipendenze frontend
+        run: cd frontend && npm ci
+
+      - name: Installa Chromium per Playwright
+        run: cd frontend && npx playwright install --with-deps chromium
+
+      - name: Test E2E (build frontend + suite Playwright)
+        run: cd frontend && npm run test:e2e

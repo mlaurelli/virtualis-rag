@@ -1,0 +1,115 @@
+services:
+  # LLM locale: nessun dato lascia la macchina. Solo CPU: il modello
+  # (qwen2.5:14b-instruct, ~9 GB) va scaricato una tantum con
+  # `docker compose exec ollama ollama pull qwen2.5:14b-instruct`.
+  # Scelto perché sta interamente nei 16 GB di VRAM (100% GPU) e non ha
+  # thinking: ~82 token/s, domanda agentica completa in ~30 s.
+  # Porta NON pubblicata: raggiungibile solo dentro la rete compose.
+  ollama:
+    image: ollama/ollama:latest
+    # Tetto di memoria prudente (host da 30 GB): uso reale ~8 GB col modello
+    # caricato (9,5 GB in VRAM + KV cache), 10g lascia margine senza regalare
+    # RAM che serve al container app durante l'ingest
+    mem_limit: 10g
+    environment:
+      # Contesto ampio: i prompt RAG col corpus reale superano i 10k token;
+      # col default (4096 diviso su 2 slot = ~2048/richiesta) Ollama TRONCAVA
+      # i prompt e il modello rispondeva fuori tema. 16k con slot singolo:
+      # KV cache ~3 GB, sta in VRAM col modello (9,5 GB su 16 GB).
+      OLLAMA_CONTEXT_LENGTH: "16384"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ollama-models:/root/.ollama
+    # GPU NVIDIA (RTX 5080): richiede driver + nvidia-container-toolkit sull'host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/11434' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  # Applicazione completa (backend FastAPI + build frontend React).
+  # Il build avviene dalla radice del repository (backend/Dockerfile,
+  # multi-stage: node:20-alpine per il frontend, python:3.12-slim per il backend).
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Tetto di memoria prudente (host da 30 GB): modelli di retrieval +
+    # Qdrant embedded tengono ~6 GB fissi, ma il processo principale gonfia
+    # durante l'ingest (allocatori torch/onnx che non rilasciano): osservato
+    # a 15,7 GB dopo pochi documenti il 27/08. A 16g i malloc nativi
+    # fallivano e la coda moriva; 20g dà margine (ollama scende a 10g)
+    mem_limit: 20g
+    ports:
+      - "8000:8000"    # accesso locale / tunnel SSH
+      - "8080:8000"    # accesso esterno (HTTPS): unica porta aperta dal provider
+    env_file:
+      # Chiavi sensibili (JWT_SECRET, ...): opzionale,
+      # le variabili in `environment` qui sotto hanno comunque precedenza
+      - path: .env
+        required: false
+    environment:
+      # Qdrant embedded in /data/qdrant (indice migrato dalla workstation):
+      # nessun server vettoriale separato, nessuna porta extra esposta
+      QDRANT_URL: ""
+      DATA_DIR: /data
+      UPLOAD_DIR: /data/uploads
+      # LLM locale via servizio ollama (endpoint OpenAI-compatible)
+      KIMI_BASE_URL: http://ollama:11434/v1
+      KIMI_MODEL: qwen2.5:14b-instruct
+      MOONSHOT_API_KEY: ollama
+      KIMI_REASONING_EFFORT: ""
+      LLM_REQUEST_TIMEOUT: "600"
+      # VAS del worker di conversione (non RSS): torch+Docling con i modelli
+      # di layout/OCR caricati superano i 16 GB di spazio di indirizzamento
+      # anche su file piccoli; il tetto RSS resta il mem_limit del container
+      CONVERT_MAX_MEMORY_MB: "24576"
+      # Riciclo del worker ogni N conversioni: torch/Docling non rilasciano
+      # la RSS e sotto carico il container andava a ridosso del mem_limit
+      # (malloc nativi falliti, coda ingest morta il 26/08 sera)
+      CONVERT_WORKER_MAX_TASKS: "8"
+      # Budget REALE del contesto di sintesi: Ollama ha 16k di contesto
+      # (vedi OLLAMA_CONTEXT_LENGTH sopra) e il budget deve lasciarne per
+      # prompt di sistema, storia, contesto KG e margine di generazione
+      SYNTHESIZE_MAX_CONTEXT_TOKENS: "10000"
+      # TLS attivo (cert self-signed, SAN: IP pubblico, IP LAN, pc-vir5,
+      # localhost): accesso LAN e tunnel cifrati. Nota: il firewall del
+      # provider filtra l'handshake TLS dall'esterno, quindi l'esposizione
+      # Internet resta di fatto chiusa (voluto: il cliente lavora in LAN).
+      TLS_CERT_FILE: /data/certs/virtualis.crt
+      TLS_KEY_FILE: /data/certs/virtualis.key
+    volumes:
+      - ./data:/data                 # SQLite, upload, file di lavoro, Qdrant embedded
+      - hf-models:/root/.cache/huggingface  # cache modelli di retrieval (~2-4 GB)
+      # Cartella di rete del cliente (share SMB //192.168.69.252/IA-LOCALE
+      # montata sull'host in /mnt/ia-locale, sola lettura). propagation:rslave
+      # fa vedere al container anche i remount dell'automount systemd.
+      - type: bind
+        source: /mnt/ia-locale
+        target: /data/mounts/ia-locale
+        read_only: true
+        bind:
+          propagation: rslave
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  hf-models:
+  ollama-models:
+
+# NOTA: per lo sviluppo locale resta valido l'avvio fuori da Docker
+# (uvicorn + dev server Vite, vedi README). Il servizio `app` è pensato
+# per la produzione: `docker compose up -d --build`.
+# Per usare Qdrant come server esterno (alternativa all'embedded), vedere
+# la cronologia git del compose o il README.

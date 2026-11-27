@@ -1,0 +1,32 @@
+[
+  {
+    "question": "Qual è la procedura prevista per richiedere il rimborso delle spese di trasferta?",
+    "expected_substrings": ["rimborso", "trasferta"],
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Chi è il responsabile dell'approvazione dei documenti e con quali tempistiche?",
+    "expected_substrings": ["responsabile", "approvazione"],
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Quali sono le scadenze principali previste dal regolamento aziendale?",
+    "expected_substrings": ["scadenz"],
+    "must_cite": true,
+    "min_results": 2
+  },
+  {
+    "question": "Quali sanzioni sono previste in caso di violazione delle procedure?",
+    "expected_substrings": ["sanzion"],
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "In quali documenti si parla di protezione dei dati personali e quali misure sono indicate?",
+    "expected_substrings": ["dati personali"],
+    "must_cite": true,
+    "min_results": 2
+  }
+]

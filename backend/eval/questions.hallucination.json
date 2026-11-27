@@ -1,0 +1,47 @@
+[
+  {
+    "question": "Come si programma il ricevitore NICE Florx2r?",
+    "expects_no_answer": true
+  },
+  {
+    "question": "Qual è la procedura di reset della centralina BFT Athos AC A25 descritta nel manuale?",
+    "expects_no_answer": true
+  },
+  {
+    "question": "Quali sono le condizioni del contratto con la ditta Verdini Impianti Srl firmato nel 2019?",
+    "expects_no_answer": true
+  },
+  {
+    "question": "Che ruolo ricopre l'ingegner Tarquinio Malaspina nell'organigramma aziendale?",
+    "expects_no_answer": true
+  },
+  {
+    "question": "Quali sono i codici di errore del plotter Ricoh ZX-9100 e come si risolvono?",
+    "expects_no_answer": true
+  },
+  {
+    "question": "Quali contratti sono presenti nel materiale indicizzato e con quali fornitori?",
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Cosa risulta dal DURC più recente presente nella documentazione?",
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Quali attività sono previste nei corsi STEM finanziati dal PNRR?",
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Quali documenti riguardano preventivi e a cosa si riferiscono?",
+    "must_cite": true,
+    "min_results": 1
+  },
+  {
+    "question": "Quali comunicazioni via email riguardano scadenze o pagamenti?",
+    "must_cite": true,
+    "min_results": 1
+  }
+]
